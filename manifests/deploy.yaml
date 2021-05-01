@@ -16,7 +16,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: account
+  name: collector
   labels:
     app: stock-trader
   annotations:
@@ -25,171 +25,60 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: account
+      app: collector
   template:
     metadata:
       labels:
-        app: account
+        app: collector
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: "9080"
     spec:
       containers:
-      - name: account
-#       image: account:latest # Microservice Builder
-#       image: mycluster.icp:8500/stock-trader/account:latest # IBM Cloud Private
-#       image: registry.ng.bluemix.net/stock_trader/account:latest # IBM Kubernetes Service
-        image: ibmstocktrader/account:latest # Docker Hub
+      - name: collector
+#       image: collector:latest # Microservice Builder
+#       image: mycluster.icp:8500/stock-trader/collector:latest # IBM Cloud Private
+#       image: registry.ng.bluemix.net/stock_trader/collector:latest # IBM Kubernetes Service
+        image: ibmstocktrader/collector:latest # Docker Hub
         env:
-          - name: JDBC_HOST
+          - name: CLOUDANT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: test-config
+                key: cloudant.url
+          - name: CLOUDANT_DB
+            valueFrom:
+              configMapKeyRef:
+                name: test-config
+                key: cloudant.collector
+          - name: CLOUDANT_ID
             valueFrom:
               secretKeyRef:
-                name: db2
-                key: host
-          - name: JDBC_PORT
+                name: test-credentials
+                key: cloudant.id
+          - name: CLOUDANT_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: db2
-                key: port
-          - name: JDBC_DB
-            valueFrom:
-              secretKeyRef:
-                name: db2
-                key: db
-          - name: JDBC_ID
-            valueFrom:
-              secretKeyRef:
-                name: db2
-                key: id
-          - name: JDBC_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: db2
-                key: pwd
-          - name: MQ_ID
-            valueFrom:
-              secretKeyRef:
-                name: mq
-                key: id
-          - name: MQ_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: mq   
-                key: pwd
-          - name: MQ_HOST
-            valueFrom:
-              secretKeyRef:
-                name: mq
-                key: host
-          - name: MQ_PORT
-            valueFrom:
-              secretKeyRef:
-                name: mq   
-                key: port
-          - name: MQ_CHANNEL
-            valueFrom:
-              secretKeyRef:
-                name: mq   
-                key: channel
-          - name: MQ_QUEUE_MANAGER
-            valueFrom:
-              secretKeyRef:
-                name: mq   
-                key: queue-manager
-          - name: MQ_QUEUE
-            valueFrom:
-               secretKeyRef:
-                 name: mq   
-                 key: queue
-          - name: WATSON_URL
-            valueFrom:
-              secretKeyRef:
-                name: watson
-                key: url
-          - name: WATSON_ID
-            valueFrom:
-              secretKeyRef:
-                name: watson
-                key: id
-                optional: true
-          - name: WATSON_PWD
-            valueFrom:
-              secretKeyRef:
-                name: watson
-                key: pwd
-          - name: ODM_URL
-            valueFrom:
-              secretKeyRef:
-                name: odm
-                key: url
-                optional: true
-          - name: ODM_ID
-            valueFrom:
-              secretKeyRef:
-                name: odm
-                key: id
-                optional: true
-          - name: ODM_PWD
-            valueFrom:
-              secretKeyRef:
-                name: odm
-                key: pwd
-                optional: true
-          - name: KAFKA_TOPIC
-            valueFrom:
-              secretKeyRef:
-                name: kafka
-                key: topic
-                optional: true
-          - name: KAFKA_ADDRESS
-            valueFrom:
-              secretKeyRef:
-               name: kafka
-               key: address
-               optional: true
-          - name: KAFKA_USER
-            valueFrom:
-             secretKeyRef:
-               name: kafka
-               key: user
-               optional: true
-          - name: KAFKA_API_KEY
-            valueFrom:
-             secretKeyRef:
-                name: kafka
-                key: api-key
-                optional: true
-          # location of the keystore.  See below comments about volumeMount
-          - name: KAFKA_KEYSTORE
-            valueFrom:
-              secretKeyRef:
-                name: kafka
-                key: keystore
-                optional: true
+                name: test-credentials
+                key: cloudant.password
           - name: JWT_AUDIENCE
             valueFrom:
-              secretKeyRef:
-                name: jwt 
-                key: audience
+              configMapKeyRef:
+                name: test-config
+                key: jwt.audience
           - name: JWT_ISSUER
             valueFrom:
-              secretKeyRef:
-                name: jwt
-                key: issuer
+              configMapKeyRef:
+                name: test-config
+                key: jwt.issuer
           - name: STOCK_QUOTE_URL
             valueFrom:
               configMapKeyRef:
                 name: urls
                 key: stock-quote
                 optional: true
-          - name: TRADE_HISTORY_URL
-            valueFrom:
-              configMapKeyRef:
-               name: urls
-               key: trade-history
-               optional: true
           - name: WLP_LOGGING_CONSOLE_FORMAT
-            value: json
+            value: DEV
           - name: WLP_LOGGING_CONSOLE_SOURCE
             value: message,ffdc
         ports:
@@ -200,7 +89,7 @@ spec:
           httpGet:
             path: /health/ready
             port: 9080
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 15
           successThreshold: 1
           failureThreshold: 3
@@ -208,7 +97,7 @@ spec:
           httpGet:
             path: /health/live
             port: 9080
-          initialDelaySeconds: 90
+          initialDelaySeconds: 120
           periodSeconds: 15
           successThreshold: 1
           failureThreshold: 5 # Allow a little time to exec into the pod to grab FFDCs before it's killed
@@ -217,8 +106,8 @@ spec:
             cpu: 500m
             memory: 500Mi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 250m
+            memory: 256Mi
       #  Uncomment the following lines to get the keystore from the secret
 #        volumeMounts:
 #        - mountPath: /keystores
@@ -229,29 +118,13 @@ spec:
 #        secret:
 #         secretName: kafka-keystore
 ---
-#Deploy the autoscaler
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: account-hpa
-  labels:
-    solution: stock-trader
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: account
-  maxReplicas: 10
-  minReplicas: 2
-  targetCPUUtilizationPercentage: 60
----
 #Deploy the service
 apiVersion: v1
 kind: Service
 metadata:
-  name: account-service
+  name: collector-service
   labels:
-    app: account
+    app: collector
     solution: stock-trader
   annotations:
     prometheus.io/scrape: "true"
@@ -269,27 +142,4 @@ spec:
       targetPort: 9443
   selector:
     app: account
----   
-#Configure the ingress 
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    ingress.kubernetes.io/affinity: "cookie"
-    ingress.kubernetes.io/session-cookie-name: "route"
-    ingress.kubernetes.io/session-cookie-hash: "sha1"
-    ingress.kubernetes.io/secure-backends: "true"
-    ingress.kubernetes.io/app-root: "/account"
-  name: account-ingress
-  labels:
-    app: stock-trader
-spec:
-  rules:
-  - host:
-    http:
-      paths:
-      - path: /account
-        backend:
-          serviceName: account-service
-          servicePort: 9443
+

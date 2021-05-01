@@ -1,4 +1,4 @@
-#       Copyright 2020 IBM Corp All Rights Reserved
+#       Copyright 2021 IBM Corp All Rights Reserved
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -36,8 +36,7 @@ COPY src/main/liberty/config /opt/ol/wlp/usr/servers/defaultServer/
 # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
 RUN features.sh
 
-COPY --from=build /usr/target/account-1.0-SNAPSHOT.war /opt/ol/wlp/usr/servers/defaultServer/apps/Account.war
-COPY --from=build /usr/target/prereqs/wmq.jmsra-9.2.1.0.rar /opt/ol/wlp/usr/servers/defaultServer/wmq.jmsra.rar
+COPY --from=build /usr/target/collector-1.0-SNAPSHOT.war /opt/ol/wlp/usr/servers/defaultServer/apps/Collector.war
 COPY --from=build /usr/target/prereqs/cloudant-* /opt/ol/wlp/usr/servers/defaultServer/
 COPY --from=build /usr/target/prereqs/commons-* /opt/ol/wlp/usr/servers/defaultServer/
 COPY --from=build /usr/target/prereqs/gson-* /opt/ol/wlp/usr/servers/defaultServer/
