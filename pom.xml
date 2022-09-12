@@ -130,6 +130,18 @@
                             <excludeScope>provided</excludeScope>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>copy-cloudant-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/prereqs</outputDirectory>
+                            <!-- Need to include the "provided" cloudant jars that got excluded above -->
+                            <includeArtifactIds>cloudant-client,cloudant-http,okhttp-urlconnection</includeArtifactIds>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
